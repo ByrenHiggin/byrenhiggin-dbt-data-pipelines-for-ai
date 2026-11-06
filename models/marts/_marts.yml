@@ -1,0 +1,72 @@
+models:
+  - name: customer_features
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: lifetime_value_aud
+        data_tests:
+          - not_null
+      - name: days_since_last_order
+        data_tests:
+          - max_null_ratio:
+              arguments:
+                max_ratio: 0.05
+              config:
+                severity: warn
+
+  - name: training_churn
+    columns:
+      - name: customer_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('customer_features')
+                field: customer_id
+      - name: plan
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['starter', 'business', 'enterprise']
+
+  - name: ai_documents
+    config:
+      materialized: table  # constraints are only enforced on tables
+      contract:
+        enforced: true
+    columns:
+      - name: document_id
+        data_type: text
+        constraints: [{type: not_null}, {type: primary_key}]
+        data_tests: [unique]
+      - name: title
+        data_type: text
+      - name: content
+        data_type: text
+      - name: category
+        data_type: text
+      - name: updated_at
+        data_type: timestamp
+      - name: content_hash
+        data_type: text
+
+unit_tests:
+  - name: churn_is_180_days_without_an_order
+    model: customer_features
+    overrides:
+      vars:
+        as_of_date: '2026-10-01'
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: 1}
+          - {customer_id: 2}
+          - {customer_id: 3}
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 10, customer_id: 1, ordered_at: '2026-09-01', total_aud: 120}
+          - {order_id: 11, customer_id: 2, ordered_at: '2026-01-15', total_aud: 80}
+    expect:
+      rows:
+        - {customer_id: 1, days_since_last_order: 30,   is_churned: false}
+        - {customer_id: 2, days_since_last_order: 259,  is_churned: true}
+        - {customer_id: 3, days_since_last_order: null, is_churned: true}

@@ -1,0 +1,15 @@
+name: ai_data
+version: '1.0.0'
+profile: ai_data
+
+model-paths: ["models"]
+snapshot-paths: ["snapshots"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+models:
+  ai_data:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
